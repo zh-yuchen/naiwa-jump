@@ -227,7 +227,7 @@ function refresh(keepRetrying) {
       renderFallback('连不上排行榜');
       if (retryLeft > 0 && isOpen()) {
         retryLeft--;
-        setStatus('连不上排行榜，' + (retryLeft + 1) + ' 秒后重试…');
+        setStatus('连不上排行榜，正在重试…');
         clearTimeout(retryTimer);
         retryTimer = setTimeout(() => refresh(false), 4000);
       }
