@@ -193,6 +193,8 @@ function renderFallback(reason) {
 function refresh() {
   if (busy) return;
   busy = true;
+  const list = $('boardList');
+  if (list) list.innerHTML = '';       // 先清空，别让上一次的内容留在那儿
   setStatus('正在读取排行榜…');
   fetchBoard()
     .then((recs) => { renderList(recs); })

@@ -1591,7 +1591,8 @@ function boot() {
   resetGame();
   game.state = 'ready';
   refreshStart();
-  renderBoard();
+  /* 排行榜改成「点了才渲染」：在线榜由 leaderboard.js 负责，
+     这里预渲染只会先闪一下本机记录，没必要 */
   bindInput();
   $('btnMute').textContent = Store.data.muted ? '🔇' : '🔊';
   requestAnimationFrame(drawHero);
