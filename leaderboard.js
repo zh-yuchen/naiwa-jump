@@ -90,39 +90,50 @@ function storeName(n) {
 }
 
 /* ---------- 网络 ---------- */
-function post(params, retry) {
+const RETRY = 3;                                       // 最多重试 3 次（共 4 次请求）
+const delay = (n) => new Promise((r) => setTimeout(r, 250 * (n + 1)));   // 退避：250/500/750
+
+/* 单次请求。
+   坑：服务端出错时可能**不带 CORS 头**，浏览器会直接抛 TypeError: Failed to fetch，
+   看起来像断网，其实只是这一发失败了 —— 所以重试策略必须放在调用方。 */
+function postOnce(params) {
   const body = new URLSearchParams();
   body.set('user', USER);
   body.set('secret', SECRET);
   for (const k in params) body.set(k, params[k]);
-  return fetch(ENDPOINT, { method: 'POST', body: body })
-    .then((res) => {
-      if (!res.ok) {
-        // 接口偶发 502，自动重试一次
-        if (!retry && res.status >= 500) return post(params, true);
-        throw new Error('HTTP ' + res.status);
+  return fetch(ENDPOINT, { method: 'POST', body: body }).then((res) => {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.text();
+  });
+}
+
+/* 读榜单：空结果和网络错误都重试 —— 服务端两种抽风都会犯。
+   同一个请求会时而返回整页、时而返回空对象（100/0/100/0 交替），
+   所以空结果不能当成「榜是空的」。 */
+function fetchBoard(attempt) {
+  attempt = attempt || 0;
+  return postOnce({ action: 'search', tag: PREFIX, no: 1, count: COUNT, type: 'both' })
+    .then((text) => {
+      const recs = parsePage(text);
+      if (recs === null) throw new Error('返回的不是 JSON');
+      if (recs.length === 0 && attempt < RETRY) {
+        return delay(attempt).then(() => fetchBoard(attempt + 1));
       }
-      return res.text();
+      return rankWindow(recs);
     })
     .catch((err) => {
-      if (!retry) return post(params, true);
+      if (attempt < RETRY) return delay(attempt).then(() => fetchBoard(attempt + 1));
       throw err;
     });
 }
 
-function fetchBoard(attempt) {
+/* 写榜单：失败也重试，但别让玩家等太久 */
+function postRety(params, attempt) {
   attempt = attempt || 0;
-  return post({ action: 'search', tag: PREFIX, no: 1, count: COUNT, type: 'both' })
-    .then((text) => {
-      const recs = parsePage(text);
-      if (recs === null) throw new Error('返回的不是 JSON');
-      /* 这个接口不稳定：同一个请求会时而返回整页、时而返回空对象。
-         空结果不能当成「榜是空的」，多确认几次再下结论。 */
-      if (recs.length === 0 && attempt < 3) {
-        return new Promise((r) => setTimeout(r, 250)).then(() => fetchBoard(attempt + 1));
-      }
-      return rankWindow(recs);
-    });
+  return postOnce(params).catch((err) => {
+    if (attempt < RETRY) return delay(attempt).then(() => postRety(params, attempt + 1));
+    throw err;
+  });
 }
 
 /* ---------- 界面 ---------- */
@@ -219,7 +230,7 @@ function submit(score, combo) {
   const name = storedName();
   const tag = PREFIX + now.toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   const value = JSON.stringify({ n: name, s: score, t: now });
-  return post({ action: 'update', tag: tag, value: value })
+  return postRety({ action: 'update', tag: tag, value: value })
     .then(() => true)
     .catch(() => false);
 }
