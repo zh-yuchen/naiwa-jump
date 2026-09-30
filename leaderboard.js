@@ -57,7 +57,8 @@ function shouldSubmit(score, lastAt, now) {
   return true;
 }
 
-/* 把服务端返回的 {tag: "json字符串"} 解析成记录数组 */
+/* 注意：tag 参数并不能真正按前缀过滤（返回里混着别的游戏的记录），
+   所以必须在这里按 PREFIX 过滤一次。 */
 function parsePage(text) {
   let obj = null;
   try { obj = JSON.parse(text); } catch (e) { return null; }
@@ -109,11 +110,17 @@ function post(params, retry) {
     });
 }
 
-function fetchBoard() {
+function fetchBoard(attempt) {
+  attempt = attempt || 0;
   return post({ action: 'search', tag: PREFIX, no: 1, count: COUNT, type: 'both' })
     .then((text) => {
       const recs = parsePage(text);
       if (recs === null) throw new Error('返回的不是 JSON');
+      /* 这个接口不稳定：同一个请求会时而返回整页、时而返回空对象。
+         空结果不能当成「榜是空的」，多确认几次再下结论。 */
+      if (recs.length === 0 && attempt < 3) {
+        return new Promise((r) => setTimeout(r, 400)).then(() => fetchBoard(attempt + 1));
+      }
       return rankWindow(recs);
     });
 }
