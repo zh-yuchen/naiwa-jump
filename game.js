@@ -284,6 +284,26 @@ const YELLOW_TOP = '#ffdd8a', YELLOW_MID = '#ffc044', YELLOW_LOW = '#ffa33b';
 const CREAM = '#fde4c7', EYE_GREEN = '#61cb8b', EYE_GREEN_D = '#2c9571';
 const INK = '#38383d', FOOT = '#d9835c';
 
+/* Kenney CC0 贴图（同样来自 Starter Kit 3D Platformer）。
+   加载失败就自动退回矢量绘制，不影响游戏。
+   注意：主 canvas 一旦 drawImage 外部图片就会被污染，所以成绩卡
+   必须继续走 buildShareCard() 里那块「纯程序化绘制」的独立 canvas。 */
+const IMG = { shadow: null, particle: null, coin: null };
+(function loadSprites() {
+  if (typeof Image === 'undefined') return;
+  const src = {
+    shadow: 'assets/img/blob_shadow.png',
+    particle: 'assets/img/particle.png',
+    coin: 'assets/img/coin.png'
+  };
+  for (const k in src) {
+    const im = new Image();
+    im.onload = () => { IMG[k] = im; };
+    im.onerror = () => { IMG[k] = null; };
+    im.src = src[k];
+  }
+})();
+
 /* 画「奶娃」身体。x,y = 脚底中心；h = 身高；expr = 表情 key */
 function drawNaiwa(g, x, y, h, expr, opts) {
   opts = opts || {};
@@ -561,7 +581,8 @@ function resize() {
   if (game.state === 'idle' || game.state === 'charging') {
     game.char.y = GY;
   }
-  document.getElementById('rotate').classList.toggle('hidden', cssW / cssH >= 0.92);
+  /* 竖屏才隐藏「请竖屏」提示；横屏(比例 >= 0.92)时显示 */
+  document.getElementById('rotate').classList.toggle('hidden', cssW / cssH < 0.92);
 }
 
 /* ------------------------------------------------------------
@@ -605,6 +626,7 @@ const game = {
   shake: 0, shakeMag: 0,
   particles: [],
   popups: [],
+  coins: [],
   time: 0,
   perfectFlash: 0,
   missReason: ''
@@ -641,7 +663,7 @@ function spawnNext() {
 
 function resetGame() {
   game.score = 0; game.combo = 0; game.maxCombo = 0;
-  game.particles.length = 0; game.popups.length = 0;
+  game.particles.length = 0; game.popups.length = 0; game.coins.length = 0;
   game.shake = 0; game.shakeMag = 0; game.perfectFlash = 0;
   game.missReason = '';
   const first = makePlatform(60, 92, 0);
@@ -708,16 +730,22 @@ window.addEventListener('keyup', (e) => {
 /* ------------------------------------------------------------
  * 8. 特效小工具
  * ---------------------------------------------------------- */
-function burst(x, y, n, color, speed, life) {
+function burst(x, y, n, color, speed, life, sprite) {
   for (let i = 0; i < n; i++) {
     const a = Math.random() * TAU;
     const s = speed * rand(0.4, 1.2);
     game.particles.push({
       x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30,
       life: 0, max: (life || 0.7) * rand(0.7, 1.3),
-      size: rand(1.6, 4.2), color: color || '#ffd84d', grav: 420
+      size: rand(1.6, 4.2), color: color || '#ffd84d', grav: 420,
+      sprite: !!sprite, rot: rand(0, TAU), spin: rand(-6, 6)
     });
   }
+}
+
+/* 完美落地时弹出的金币（Kenney coin.png） */
+function popCoin(x, y) {
+  game.coins.push({ x, y, life: 0, max: 0.85, spin: rand(-3.4, 3.4), rise: rand(46, 62) });
 }
 function popup(x, y, text, color, size) {
   game.popups.push({ x, y, text, color: color || '#fff', size: size || 20, life: 0, max: 0.95 });
@@ -792,6 +820,11 @@ function update(dt) {
     q.life += dt;
     q.y -= dt * 46;
     if (q.life >= q.max) game.popups.splice(i, 1);
+  }
+  for (let i = game.coins.length - 1; i >= 0; i--) {
+    const q = game.coins[i];
+    q.life += dt;
+    if (q.life >= q.max) game.coins.splice(i, 1);
   }
 
   /* --- 相机 --- */
@@ -878,8 +911,9 @@ function handleLanding() {
       SFX.perfect(game.combo);
       Snd.play('coin', 0.5, 1 + Math.min(game.combo, 8) * 0.045);
       if (game.combo >= 2) SFX.abstract();
-      burst(landX, GY - 6, 16, '#fff0a0', 150, 0.9);
+      burst(landX, GY - 6, 16, '#fff0a0', 150, 0.9, true);
       burst(landX, GY - 6, 8, EXPR[hit.expr].top, 110, 1.1);
+      popCoin(landX, GY - 24);
       popup(landX, GY - 58, '完美 +' + gain, '#fff8c8', 22);
       game.shake = 1; game.shakeMag = 4.5;
       game.perfectFlash = 1;
@@ -894,7 +928,7 @@ function handleLanding() {
       c.expr = Math.abs(off) > hit.w * 0.40 ? 'shock' : 'meh';
       SFX.land();
       Snd.play('land', 0.45, 0.95 + Math.random() * 0.12);
-      burst(landX, GY - 4, 8, '#ffffff', 80, 0.6);
+      burst(landX, GY - 4, 8, '#ffffff', 80, 0.6, true);
       popup(landX, GY - 54, '+1', '#ffffff', 18);
       game.shake = 1; game.shakeMag = 2;
       hit.expr = EXPR_INDEX[Math.random() < 0.5 ? 'meh' : 'shock'];
@@ -1088,12 +1122,19 @@ function drawChar() {
 
   /* 地面影子 */
   if (game.state !== 'falling') {
+    const air = clamp((GY - y) / 260, 0, 1);
     ctx.save();
-    ctx.globalAlpha = clamp(1 - (GY - y) / 260, 0.08, 0.30);
-    ctx.fillStyle = '#6b3d0a';
-    ctx.beginPath();
-    ctx.ellipse(x, GY + 6, CHAR_W * 0.72, 5.2, 0, 0, TAU);
-    ctx.fill();
+    ctx.globalAlpha = clamp(1 - air, 0.07, 0.22);
+    if (IMG.shadow) {
+      const sw = CHAR_W * (2.3 + air * 1.1);
+      const sh = sw * 0.40;                 // 压扁成椭圆，贴地感更强
+      ctx.drawImage(IMG.shadow, x - sw / 2, GY + 4 - sh / 2, sw, sh);
+    } else {
+      ctx.fillStyle = '#6b3d0a';
+      ctx.beginPath();
+      ctx.ellipse(x, GY + 6, CHAR_W * 0.72, 5.2, 0, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -1150,17 +1191,42 @@ function drawFX() {
     const k = 1 - q.life / q.max;
     ctx.save();
     ctx.globalAlpha = clamp(k, 0, 1);
-    ctx.beginPath();
-    ctx.arc(q.x - game.cam, q.y, q.size * k, 0, TAU);
-    ctx.fillStyle = q.color;
-    ctx.fill();
+    if (q.sprite && IMG.particle) {
+      const s = 10 * (0.5 + k * 0.9);
+      ctx.translate(q.x - game.cam, q.y);
+      ctx.rotate(q.rot + q.life * q.spin);
+      ctx.drawImage(IMG.particle, -s / 2, -s / 2, s, s);
+    } else {
+      ctx.beginPath();
+      ctx.arc(q.x - game.cam, q.y, q.size * k, 0, TAU);
+      ctx.fillStyle = q.color;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  for (const q of game.coins) {
+    const k = clamp(1 - q.life / q.max, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.translate(q.x - game.cam, q.y - q.rise * (1 - (1 - k) * (1 - k)));
+    if (IMG.coin) {
+      const s = 26 * (0.55 + (1 - k) * 0.6);
+      ctx.rotate(Math.sin(q.spin) * 0.25);
+      ctx.drawImage(IMG.coin, -s / 2, -s / 2, s, s);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, 11 * (0.55 + (1 - k) * 0.6), 0, TAU);
+      ctx.fillStyle = '#ffc044';
+      ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#ffa33b'; ctx.stroke();
+    }
     ctx.restore();
   }
   for (const q of game.popups) {
     const k = 1 - q.life / q.max;
     ctx.save();
     ctx.globalAlpha = clamp(k * 1.4, 0, 1);
-    ctx.font = '900 ' + q.size + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.font = '400 ' + q.size + 'px "Lilita One","PingFang SC","Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(70,45,15,.55)';
@@ -1544,5 +1610,5 @@ function boot() {
 }
 
 boot();
-window.__naiwa = { game, Store, SFX, Snd, resetGame, startGame, difficulty, spawnNext, powerForRange, rangeOf };
+window.__naiwa = { game, Store, SFX, Snd, IMG, resetGame, startGame, difficulty, spawnNext, powerForRange, rangeOf, buildShareCard };
 })();

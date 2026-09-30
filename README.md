@@ -1,5 +1,7 @@
 # 奶娃跳一跳 🐣
 
+<p align="center"><img src="preview.png" width="360" alt="奶娃跳一跳"></p>
+
 一个**打开网页就能玩**的手机小游戏：长按屏幕蓄力，松手起跳，落点越靠平台中心得分越高。
 
 > 单指操作 · 一局 30～60 秒 · 竖屏 9:16 · 纯前端零依赖
@@ -44,9 +46,11 @@
 index.html      页面骨架 + 覆盖层（开始/结束/排行榜/成绩卡）
 style.css       竖屏 9:16 样式，safe-area 适配
 game.js         全部游戏逻辑（约 900 行，无框架）
+preview.png     预览图
 assets/
   bgm.mp3       背景音乐
   sfx/*.mp3     Kenney CC0 音效（jump/land/coin/fall/break）
+  img/*.png     Kenney CC0 贴图（影子 / 粒子 / 金币）
   fonts/        Lilita One（SIL OFL 1.1）—— 分数与按钮字体
   meme-*.jpg    奶娃梗图（覆盖层背景）
 ```
@@ -81,8 +85,9 @@ python -m http.server 8080     # 然后访问 http://localhost:8080
 node _smoke/harness.js
 ```
 
-用最小 DOM/Canvas 桩件真跑主循环，覆盖 16 项断言：连续 30 次完美落地、连击与加分曲线、
-难度递增后「平台更窄 / 间距更大但仍在最大射程内」、跳空结束、排行榜落库、120 帧渲染无异常。
+用最小 DOM/Canvas 桩件真跑主循环，覆盖 21 项断言：连续 30 次完美落地、连击与加分曲线、
+难度递增后「平台更窄 / 间距更大但仍在最大射程内」、跳空结束、排行榜落库、完美落地弹金币、
+贴图缺失时自动退回矢量绘制、成绩卡可生成、横竖屏遮罩切换、120 帧渲染无异常。
 
 ## 授权
 
