@@ -90,8 +90,9 @@ function storeName(n) {
 }
 
 /* ---------- 网络 ---------- */
-const RETRY = 3;                                       // 最多重试 3 次（共 4 次请求）
-const delay = (n) => new Promise((r) => setTimeout(r, 250 * (n + 1)));   // 退避：250/500/750
+const RETRY = 4;                                       // 单次读取内部最多重试 4 次（共 5 次请求）
+const RETRY_TIMES = 5;                                 // 榜单开着时最多再多轮询 5 次
+const delay = (n) => new Promise((r) => setTimeout(r, 250 * (n + 1)));   // 退避：250/500/750/1000
 
 /* 单次请求。
    坑：服务端出错时可能**不带 CORS 头**，浏览器会直接抛 TypeError: Failed to fetch，
@@ -139,6 +140,13 @@ function postRety(params, attempt) {
 /* ---------- 界面 ---------- */
 let lastSubmitAt = 0;
 let busy = false;
+let retryLeft = 0;
+let retryTimer = null;
+
+function isOpen() {
+  const el = $('boardScreen');
+  return !!el && el.classList.contains('show');
+}
 
 function setStatus(msg, kind) {
   const el = $('boardStatus');
@@ -201,15 +209,29 @@ function renderFallback(reason) {
   setStatus(reason + '，下面是本机记录');
 }
 
-function refresh() {
+/* 这个接口的脾气：能连着返回好几页正常数据，也能连着几秒吐 HTML/空对象。
+   所以失败不当成终局 —— 只要榜单还开着就继续退避重试，好了自动刷新出来。 */
+function refresh(keepRetrying) {
   if (busy) return;
+  if (keepRetrying !== false) retryLeft = RETRY_TIMES;
   busy = true;
   const list = $('boardList');
   if (list) list.innerHTML = '';       // 先清空，别让上一次的内容留在那儿
   setStatus('正在读取排行榜…');
   fetchBoard()
-    .then((recs) => { renderList(recs); })
-    .catch((err) => { renderFallback('连不上排行榜'); })
+    .then((recs) => {
+      retryLeft = 0;
+      renderList(recs);
+    })
+    .catch(() => {
+      renderFallback('连不上排行榜');
+      if (retryLeft > 0 && isOpen()) {
+        retryLeft--;
+        setStatus('连不上排行榜，' + (retryLeft + 1) + ' 秒后重试…');
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => refresh(false), 4000);
+      }
+    })
     .then(() => { busy = false; });
 }
 
