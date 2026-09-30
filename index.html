@@ -104,10 +104,17 @@
     <div class="bg-veil"></div>
     <div class="panel">
       <div class="panel-title">奶娃榜</div>
+      <div class="nick-row">
+        <label for="nickInput">我的昵称</label>
+        <input id="nickInput" type="text" maxlength="12" placeholder="默认用户" autocomplete="off"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div id="boardStatus" class="board-status">正在读取排行榜…</div>
       <ol id="boardList" class="board-list"></ol>
+      <div class="board-foot" id="boardFoot">榜单是最近 20 次提交，会被后来的人挤出去</div>
       <div class="btn-row">
-        <button id="btnBoardClose" class="btn primary">知道了</button>
-        <button id="btnBoardClear" class="btn ghost">清空</button>
+        <button id="btnBoardRefresh" class="btn primary">刷新</button>
+        <button id="btnBoardClose" class="btn ghost">关闭</button>
       </div>
       <button id="btnCopy" class="link-btn">复制成绩发群里</button>
     </div>
@@ -138,5 +145,6 @@
   </div>
 </div>
 <script src="game.js"></script>
+<script src="leaderboard.js"></script>
 </body>
 </html>

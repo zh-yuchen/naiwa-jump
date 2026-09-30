@@ -974,6 +974,8 @@ function endGame() {
   game.char.y = GY;
   Snd.play('break', 0.45);
   const isNew = Store.submit(game.score, game.maxCombo);
+  /* 结算后自动上榜；失败只影响榜单，不影响游戏 */
+  if (window.NaiwaBoard) window.NaiwaBoard.submit(game.score, game.maxCombo);
   fillOverScreen(game.score, game.maxCombo, Store.data.best, isNew);
   show($('overScreen'));
   $('hud').classList.add('hidden');
@@ -1474,7 +1476,11 @@ function bindInput() {
   document.addEventListener('gesturestart', stop, { passive: false });
   document.addEventListener('dblclick', stop, { passive: false });
   document.addEventListener('contextmenu', (e) => { if (e.target === canvas) e.preventDefault(); });
-  window.addEventListener('touchmove', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+  window.addEventListener('touchmove', (e) => {
+    /* 排行榜列表要能滚，别把它也禁掉 */
+    if (e.target && e.target.closest && e.target.closest('#boardList')) return;
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
 
   $('btnStart').addEventListener('click', () => { SFX.ui(); startGame(); });
   $('btnRetry').addEventListener('click', () => { SFX.ui(); startGame(); });
@@ -1485,11 +1491,15 @@ function bindInput() {
     show($('startScreen'));
     refreshStart();
   });
-  $('btnBoard').addEventListener('click', () => { SFX.ui(); renderBoard(); hideAllExcept('boardScreen'); show($('boardScreen')); });
-  $('btnBoardClose').addEventListener('click', () => { SFX.ui(); hideAllExcept('startScreen'); show($('startScreen')); refreshStart(); });
-  $('btnBoardClear').addEventListener('click', () => {
-    Store.data.board = []; Store.save(); renderBoard(); SFX.ui();
+  $('btnBoard').addEventListener('click', () => {
+    SFX.ui();
+    hideAllExcept('boardScreen');
+    show($('boardScreen'));
+    /* 在线榜单由 leaderboard.js 接管；没加载就退回本机记录 */
+    if (window.NaiwaBoard) window.NaiwaBoard.open();
+    else renderBoard();
   });
+  $('btnBoardClose').addEventListener('click', () => { SFX.ui(); hideAllExcept('startScreen'); show($('startScreen')); refreshStart(); });
   $('btnShare').addEventListener('click', openShare);
   $('btnShareClose').addEventListener('click', () => {
     hideAllExcept('overScreen'); show($('overScreen'));
