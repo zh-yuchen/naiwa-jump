@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffd84d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>奶娃跳一跳</title>
+<meta name="description" content="长按蓄力，松手起跳。跳中平台中心触发完美连击 —— 这就是奶娃！">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='52' rx='34' ry='42' fill='%23ffd84d'/><ellipse cx='50' cy='64' rx='18' ry='20' fill='%23fff3d0'/><circle cx='38' cy='34' r='9' fill='%238fbf4a'/><circle cx='62' cy='34' r='9' fill='%238fbf4a'/><circle cx='38' cy='34' r='4' fill='%23222'/><circle cx='62' cy='34' r='4' fill='%23222'/></svg>">
+</head>
+<body>
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="layer hidden">
+    <div class="hud-top">
+      <div class="hud-score">
+        <div id="score" class="score-value">0</div>
+        <div class="score-label">分数</div>
+      </div>
+      <div class="hud-side">
+        <div class="hud-chip">最高 <b id="best">0</b></div>
+        <div class="hud-chip">连击 <b id="combo">0</b></div>
+      </div>
+    </div>
+    <div id="comboBanner" class="combo-banner"></div>
+    <div class="hud-bottom">
+      <div class="power-wrap">
+        <div class="power-track">
+          <div id="powerFill" class="power-fill"></div>
+          <div class="power-safe"></div>
+        </div>
+        <div class="power-tip" id="powerTip">长按屏幕蓄力</div>
+      </div>
+      <button id="btnMute" class="icon-btn" aria-label="声音">🔊</button>
+    </div>
+  </div>
+
+  <!-- ===== 开始页 ===== -->
+  <div id="startScreen" class="layer overlay show">
+    <div class="bg-photo" style="background-image:url('assets/meme-happy.jpg')"></div>
+    <div class="bg-veil"></div>
+    <div class="panel">
+      <div class="logo">
+        <span class="logo-nai">奶娃</span><span class="logo-jump">跳一跳</span>
+      </div>
+      <p class="tagline">长按蓄力 · 松手起跳 · 跳中中心 = 完美连击</p>
+      <canvas id="heroArt" class="hero-art" width="360" height="260"></canvas>
+      <button id="btnStart" class="btn primary">开始游戏</button>
+      <div class="start-foot">
+        <span>最高分 <b id="startBest">0</b></span>
+        <span class="dot">·</span>
+        <span>最高连击 <b id="startCombo">0</b></span>
+        <span class="dot">·</span>
+        <button id="btnBoard" class="link-btn">排行榜</button>
+      </div>
+      <div class="meme-row">
+        <span class="meme-tag">开心</span>
+        <span class="meme-tag">无语</span>
+        <span class="meme-tag">震惊</span>
+        <span class="meme-tag">破防</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 结束页 ===== -->
+  <div id="overScreen" class="layer overlay">
+    <div class="bg-photo" id="overPhoto" style="background-image:url('assets/meme-broken.jpg')"></div>
+    <div class="bg-veil dark"></div>
+    <div class="panel">
+      <div class="over-title" id="overTitle">破防了，再來一局？</div>
+      <div class="over-sub" id="overSub">跳空了…奶娃掉下去了</div>
+      <div class="result-row">
+        <div class="result-card">
+          <div class="result-num" id="overScore">0</div>
+          <div class="result-cap">本局得分</div>
+        </div>
+        <div class="result-card">
+          <div class="result-num" id="overCombo">0</div>
+          <div class="result-cap">最高连击</div>
+        </div>
+        <div class="result-card">
+          <div class="result-num" id="overBest">0</div>
+          <div class="result-cap">历史最高</div>
+        </div>
+      </div>
+      <div class="new-record hidden" id="newRecord">🎉 新纪录！</div>
+      <div class="btn-row">
+        <button id="btnRetry" class="btn primary">再来一局</button>
+        <button id="btnShare" class="btn ghost">晒成绩</button>
+      </div>
+      <button id="btnHome" class="link-btn">返回首页</button>
+    </div>
+  </div>
+
+  <!-- ===== 排行榜 ===== -->
+  <div id="boardScreen" class="layer overlay">
+    <div class="bg-photo" style="background-image:url('assets/meme-abstract.jpg')"></div>
+    <div class="bg-veil"></div>
+    <div class="panel">
+      <div class="panel-title">奶娃榜</div>
+      <ol id="boardList" class="board-list"></ol>
+      <div class="btn-row">
+        <button id="btnBoardClose" class="btn primary">知道了</button>
+        <button id="btnBoardClear" class="btn ghost">清空</button>
+      </div>
+      <button id="btnCopy" class="link-btn">复制成绩发群里</button>
+    </div>
+  </div>
+
+  <!-- ===== 分享卡 ===== -->
+  <div id="shareScreen" class="layer overlay">
+    <div class="bg-veil dark"></div>
+    <div class="panel share-panel">
+      <div class="panel-title">长按图片保存 · 发群里</div>
+      <img id="shareImg" class="share-img" alt="成绩卡">
+      <div class="btn-row">
+        <button id="btnShareDownload" class="btn primary">保存图片</button>
+        <button id="btnShareClose" class="btn ghost">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 横屏提示 ===== -->
+  <div id="rotate" class="layer rotate hidden">
+    <div class="rotate-icon">📱</div>
+    <div>请把手机竖过来玩<br><span>奶娃在 9:16 的竖屏里才跳得动</span></div>
+  </div>
+
+  <!-- ===== 首帧加载 ===== -->
+  <div id="boot" class="layer boot">
+    <div class="boot-dot"></div><div class="boot-dot"></div><div class="boot-dot"></div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
