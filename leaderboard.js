@@ -1,5 +1,5 @@
 /* =============================================================
- *  奶娃跳一跳  ·  leaderboard.js
+ *  奶蛙跳一跳  ·  leaderboard.js
  *  在线好友排行榜 —— TinyWebDB（App Inventor 的极简 key-value 云存储）
  *
  *  为什么能用：https://tinywebdb.appinventor.space/api 走 POST 表单，

@@ -1,5 +1,5 @@
 /* =============================================================
- *  奶娃跳一跳  ·  game.js
+ *  奶蛙跳一跳  ·  game.js
  *  单指长按蓄力 → 抛物线跳跃 → 平台落点判定 → 完美连击计分
  *  纯 2D Canvas，无任何外部依赖（美术全部程序化绘制）
  * ============================================================= */
@@ -269,7 +269,25 @@ const Snd = {
 };
 
 /* ------------------------------------------------------------
- * 3. 表情定义 + 程序化「奶娃」矢量绘制
+ * 2c. 随机背景图
+ *     16 张奶蛙图（已裁掉小红书水印），每次进页面 / 每局结束换一张
+ * ---------------------------------------------------------- */
+const BG_COUNT = 16;
+const bgUrl = (i) => 'assets/bg/bg' + (i < 10 ? '0' + i : i) + '.jpg';
+let lastBg = -1;
+function randomBg() {
+  let i = lastBg;
+  let guard = 0;
+  while ((i === lastBg || i < 1) && guard++ < 40) i = 1 + Math.floor(Math.random() * BG_COUNT);
+  lastBg = i;
+  return bgUrl(i);
+}
+function applyRandomBg(el) {
+  if (el) el.style.backgroundImage = 'url("' + randomBg() + '")';
+}
+
+/* ------------------------------------------------------------
+ * 3. 表情定义 + 程序化「奶蛙」矢量绘制
  * ---------------------------------------------------------- */
 const EXPR = [
   { key: 'happy',  name: '开心', top: '#ffc044', side: '#ffa33b', dark: '#d9835c' },
@@ -288,10 +306,11 @@ const INK = '#38383d', FOOT = '#d9835c';
    加载失败就自动退回矢量绘制，不影响游戏。
    注意：主 canvas 一旦 drawImage 外部图片就会被污染，所以成绩卡
    必须继续走 buildShareCard() 里那块「纯程序化绘制」的独立 canvas。 */
-const IMG = { shadow: null, particle: null, coin: null };
+const IMG = { body: null, shadow: null, particle: null, coin: null };
 (function loadSprites() {
   if (typeof Image === 'undefined') return;
   const src = {
+    body: 'assets/img/naiwa-body.png',      // 奶蛙蛋本体（已抠图 + 抹掉自带五官）
     shadow: 'assets/img/blob_shadow.png',
     particle: 'assets/img/particle.png',
     coin: 'assets/img/coin.png'
@@ -304,8 +323,124 @@ const IMG = { shadow: null, particle: null, coin: null };
   }
 })();
 
-/* 画「奶娃」身体。x,y = 脚底中心；h = 身高；expr = 表情 key */
+/* 「奶蛙」= 那个黄蛋。有贴图就用贴图当身子，只把表情画上去；
+   贴图没加载出来就退回底下那套矢量画法，游戏照样能玩。
+
+   表情的几何是按原图量出来的：眼睛中心在 x=±0.124h、y=-0.792h，
+   半径约 0.064h；嘴在 y=-0.688h。眼睛比原图放大了一点点，不然太小看不清情绪。 */
+const EGG_EYE_LIGHT = '#8fae4a', EGG_EYE_DARK = '#5c7a26', EGG_SKIN = '#f2cf80';
+
+function drawEggFace(g, h, expr, look, blink) {
+  const eyeX = h * 0.124, eyeY = -h * 0.792;
+  const erx = h * 0.064, ery = h * 0.070;
+  const my = -h * 0.688, mw = h * 0.082;
+  const lw = Math.max(1, erx * 0.9);
+
+  [-1, 1].forEach((s) => {
+    g.save();
+    g.translate(s * eyeX, eyeY);
+    const blown = expr === 'shock';
+    const rx = erx * (blown ? 1.25 : 1), ry = ery * (blown ? 1.28 : 1);
+
+    if (expr === 'broken') {
+      /* 破防：X 眼 + 眼泪 */
+      g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fillStyle = EGG_EYE_DARK; g.fill();
+      g.strokeStyle = INK; g.lineWidth = lw; g.lineCap = 'round';
+      const d = rx * 0.78;
+      g.beginPath();
+      g.moveTo(-d, -d); g.lineTo(d, d);
+      g.moveTo(d, -d); g.lineTo(-d, d);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(s * rx * 0.65, ry * 0.60);
+      g.quadraticCurveTo(s * (rx * 0.65 + erx * 0.8), ry + ery * 1.3, s * rx * 0.50, ry + ery * 2.3);
+      g.quadraticCurveTo(s * (rx * 0.50 - erx * 0.7), ry + ery * 1.3, s * rx * 0.65, ry * 0.60);
+      g.fillStyle = 'rgba(120,200,255,.92)';
+      g.fill();
+    } else {
+      g.beginPath();
+      g.ellipse(0, 0, rx, ry, 0, 0, TAU);
+      const eg = g.createLinearGradient(0, -ry, 0, ry);
+      eg.addColorStop(0, EGG_EYE_LIGHT); eg.addColorStop(1, EGG_EYE_DARK);
+      g.fillStyle = eg; g.fill();
+
+      if (expr === 'happy') {
+        /* 开心：弯月眼 */
+        g.beginPath();
+        g.arc(0, ry * 0.35, rx * 0.78, Math.PI * 1.10, Math.PI * 1.90);
+        g.strokeStyle = INK; g.lineWidth = lw; g.lineCap = 'round';
+        g.stroke();
+      } else {
+        const px = look * rx * 0.30, py = ry * 0.10;
+        const pr = rx * (expr === 'shock' ? 0.42 : 0.62);
+        g.beginPath(); g.arc(px, py, pr, 0, TAU); g.fillStyle = '#241c12'; g.fill();
+        g.beginPath(); g.arc(px - pr * 0.38, py - pr * 0.42, pr * 0.36, 0, TAU);
+        g.fillStyle = 'rgba(255,255,255,.95)'; g.fill();
+
+        if (expr === 'meh') {
+          /* 无语：上眼皮压下来 */
+          g.beginPath();
+          g.moveTo(-rx * 1.05, -ry * 0.28);
+          g.quadraticCurveTo(0, -ry * 1.35, rx * 1.05, -ry * 0.28);
+          g.lineTo(rx * 1.05, -ry * 1.75); g.lineTo(-rx * 1.05, -ry * 1.75);
+          g.closePath(); g.fillStyle = EGG_SKIN; g.fill();
+        }
+        if (blink > 0) {
+          g.beginPath(); g.ellipse(0, 0, rx * 1.06, ry * 1.06, 0, 0, TAU);
+          g.fillStyle = EGG_SKIN; g.fill();
+        }
+      }
+    }
+    g.restore();
+  });
+
+  /* 嘴 */
+  g.save();
+  g.translate(0, my);
+  g.strokeStyle = INK; g.fillStyle = INK; g.lineCap = 'round';
+  if (expr === 'happy') {
+    g.beginPath();
+    g.moveTo(-mw, -h * 0.004);
+    g.quadraticCurveTo(0, h * 0.085, mw, -h * 0.004);
+    g.quadraticCurveTo(0, h * 0.004, -mw, -h * 0.004);
+    g.closePath(); g.fill();
+    g.beginPath(); g.ellipse(0, h * 0.038, mw * 0.42, h * 0.022, 0, 0, TAU);
+    g.fillStyle = '#e06a86'; g.fill();
+    g.fillStyle = 'rgba(255,140,150,.32)';
+    [-1, 1].forEach((s) => {
+      g.beginPath(); g.ellipse(s * h * 0.255, h * 0.022, h * 0.052, h * 0.032, 0, 0, TAU); g.fill();
+    });
+  } else if (expr === 'meh') {
+    g.lineWidth = Math.max(1, h * 0.028);
+    g.beginPath(); g.moveTo(-mw * 0.8, 0); g.lineTo(mw * 0.8, 0); g.stroke();
+  } else if (expr === 'shock') {
+    g.beginPath(); g.ellipse(0, h * 0.012, mw * 0.5, h * 0.045, 0, 0, TAU); g.fill();
+  } else {
+    g.lineWidth = Math.max(1, h * 0.028);
+    g.beginPath();
+    g.moveTo(-mw * 0.75, h * 0.022);
+    g.quadraticCurveTo(0, -h * 0.04, mw * 0.75, h * 0.022);
+    g.stroke();
+  }
+  g.restore();
+}
+
+/* 画「奶蛙」。x,y = 脚底中心；h = 身高；expr = 表情 key */
 function drawNaiwa(g, x, y, h, expr, opts) {
+  opts = opts || {};
+  if (!IMG.body) { drawNaiwaVector(g, x, y, h, expr, opts); return; }
+  const look = clamp(opts.look == null ? 0 : opts.look, -1, 1);
+  g.save();
+  g.translate(x, y);
+  g.scale(opts.sx == null ? 1 : opts.sx, opts.sy == null ? 1 : opts.sy);
+  const bw = h * (IMG.body.naturalWidth / IMG.body.naturalHeight);
+  g.drawImage(IMG.body, -bw / 2, -h, bw, h);
+  drawEggFace(g, h, expr, look, opts.blink || 0);
+  g.restore();
+}
+
+/* 备用：纯矢量画的身体（贴图没加载出来时用） */
+function drawNaiwaVector(g, x, y, h, expr, opts) {
   opts = opts || {};
   const t = opts.t || 0;
   const w = h * 0.66;
@@ -479,7 +614,7 @@ function drawNaiwa(g, x, y, h, expr, opts) {
   g.restore();
 }
 
-/* 画一个「奶娃表情包」脑袋贴纸。x,y = 中心，r = 半径 */
+/* 画一个「奶蛙表情包」脑袋贴纸。x,y = 中心，r = 半径 */
 function drawFace(g, x, y, r, expr, t) {
   g.save();
   g.translate(x, y);
@@ -589,8 +724,8 @@ function resize() {
  * 5. 物理常量
  * ---------------------------------------------------------- */
 const G = 1500;                 // 重力
-const CHAR_H = 34;              // 奶娃身高
-const CHAR_W = CHAR_H * 0.66;
+const CHAR_H = 40;              // 奶蛙身高
+const CHAR_W = CHAR_H * 0.89;   // 蛋贴图的宽高比（436:490）
 const CHARGE_MS = 1200;         // 满蓄力时间
 const PLAT_H_MIN = 46;
 const EDGE_GRACE = 5;           // 边缘宽容（世界单位）
@@ -876,7 +1011,7 @@ function handleLanding() {
   if (!hit) {
     /* 跳空 → 破防 */
     const nearEdge = game.platforms.some((p) => Math.abs(landX - p.x) < 26 || Math.abs(landX - (p.x + p.w)) < 26);
-    game.missReason = nearEdge ? '就差一点点…奶娃踩空了' : '跳过头了，奶娃直接起飞';
+    game.missReason = nearEdge ? '就差一点点…奶蛙踩空了' : '跳过头了，奶蛙直接起飞';
     game.state = 'falling';
     c.expr = 'broken';
     c.spin = landX > game.platforms[game.platforms.length - 1].x ? 1 : -1;
@@ -951,13 +1086,13 @@ function handleLanding() {
 
 const COMBO_TEXT = [
   '完美！',
-  '这就是奶娃！',
+  '这就是奶蛙！',
   '抽象！',
   '哇哦——！',
-  '奶娃本娃！',
+  '奶蛙本娃！',
   '太奶了！',
   '整活之王！',
-  '无敌奶娃！'
+  '无敌奶蛙！'
 ];
 function onCombo(n) {
   if (n < 2) return;
@@ -979,7 +1114,7 @@ function endGame() {
   fillOverScreen(game.score, game.maxCombo, Store.data.best, isNew);
   show($('overScreen'));
   $('hud').classList.add('hidden');
-  $('overPhoto').style.backgroundImage = 'url(' + (game.score >= 20 ? 'assets/meme-sit.jpg' : 'assets/meme-broken.jpg') + ')';
+  $('overPhoto').style.backgroundImage = 'url("' + randomBg() + '")';
 }
 
 /* ------------------------------------------------------------
@@ -1327,11 +1462,11 @@ function fillOverScreen(score, combo, best, isNew) {
   $('newRecord').classList.toggle('hidden', !isNew);
   const titles = [
     [0, '破防了，再來一局？', '这次是真的抽象…'],
-    [1, '还行，但能更好', '奶娃表示有点无语'],
+    [1, '还行，但能更好', '奶蛙表示有点无语'],
     [5, '有点东西！', '连续完美试试？'],
-    [10, '奶娃起飞了 🚀', '这波很稳'],
-    [20, '这就是奶娃！', '抽象程度拉满'],
-    [35, '奶娃本娃 👑', '朋友圈可以发了']
+    [10, '奶蛙起飞了 🚀', '这波很稳'],
+    [20, '这就是奶蛙！', '抽象程度拉满'],
+    [35, '奶蛙本娃 👑', '朋友圈可以发了']
   ];
   let pick = titles[0];
   for (const t of titles) if (score >= t[0]) pick = t;
@@ -1401,8 +1536,8 @@ function buildShareCard(score, combo, best) {
   g.textAlign = 'center';
   g.font = '900 86px "PingFang SC","Microsoft YaHei",sans-serif';
   g.lineWidth = 16; g.strokeStyle = '#f2b705'; g.lineJoin = 'round';
-  g.strokeText('奶娃跳一跳', W / 2, 150);
-  g.fillStyle = '#fff'; g.fillText('奶娃跳一跳', W / 2, 150);
+  g.strokeText('奶蛙跳一跳', W / 2, 150);
+  g.fillStyle = '#fff'; g.fillText('奶蛙跳一跳', W / 2, 150);
 
   /* 分数 */
   g.font = '900 250px "PingFang SC","Microsoft YaHei",sans-serif';
@@ -1427,10 +1562,10 @@ function buildShareCard(score, combo, best) {
   });
 
   /* 梗文案 */
-  const lines = score >= 30 ? ['这就是奶娃！', '抽象程度：拉满'] :
-    score >= 15 ? ['奶娃起飞了 🚀', '不服来战'] :
+  const lines = score >= 30 ? ['这就是奶蛙！', '抽象程度：拉满'] :
+    score >= 15 ? ['奶蛙起飞了 🚀', '不服来战'] :
       score >= 5 ? ['有点东西', '再跳一次就完美了'] :
-        ['破防了…', '但奶娃不服'];
+        ['破防了…', '但奶蛙不服'];
   g.fillStyle = '#fff';
   g.font = '900 64px "PingFang SC","Microsoft YaHei",sans-serif';
   g.lineWidth = 12; g.strokeStyle = 'rgba(120,70,10,.4)';
@@ -1457,7 +1592,7 @@ function openShare() {
     img.dataset.url = url;
     img.dataset.blob = '1';
     window.__shareBlob = blob;
-    window.__shareFile = new File([blob], '奶娃跳一跳-' + game.score + '分.png', { type: 'image/png' });
+    window.__shareFile = new File([blob], '奶蛙跳一跳-' + game.score + '分.png', { type: 'image/png' });
   }, 'image/png');
   hideAllExcept('shareScreen');
   show($('shareScreen'));
@@ -1493,6 +1628,7 @@ function bindInput() {
   });
   $('btnBoard').addEventListener('click', () => {
     SFX.ui();
+    applyRandomBg($('boardPhoto'));
     hideAllExcept('boardScreen');
     show($('boardScreen'));
     /* 在线榜单由 leaderboard.js 接管；没加载就退回本机记录 */
@@ -1508,17 +1644,17 @@ function bindInput() {
   $('btnShareDownload').addEventListener('click', async () => {
     const file = window.__shareFile;
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: '奶娃跳一跳', text: '我拿了 ' + game.score + ' 分，来挑战我！' }); return; } catch (e) {}
+      try { await navigator.share({ files: [file], title: '奶蛙跳一跳', text: '我拿了 ' + game.score + ' 分，来挑战我！' }); return; } catch (e) {}
     }
     const a = document.createElement('a');
     a.href = $('shareImg').src;
-    a.download = '奶娃跳一跳-' + game.score + '分.png';
+    a.download = '奶蛙跳一跳-' + game.score + '分.png';
     document.body.appendChild(a); a.click(); a.remove();
     SFX.ui();
   });
   $('btnCopy').addEventListener('click', async () => {
     const b = Store.data.board[0];
-    const txt = '【奶娃跳一跳】我最高 ' + Store.data.best + ' 分，最高连击 ' + Store.data.bestCombo +
+    const txt = '【奶蛙跳一跳】我最高 ' + Store.data.best + ' 分，最高连击 ' + Store.data.bestCombo +
       (b ? ('，上一局 ' + b.score + ' 分') : '') + '。来挑战我！';
     try {
       await navigator.clipboard.writeText(txt);
@@ -1564,7 +1700,7 @@ function drawHero(now) {
     g.fillStyle = 'rgba(255,255,255,.6)'; g.fill();
     drawFace(g, p.x + p.w / 2, p.y + 26, Math.min(p.w * 0.24, 15), EXPR[p.e].key, t);
   });
-  /* 跳动的奶娃 */
+  /* 跳动的奶蛙 */
   const hop = Math.abs(Math.sin(t * 2.1));
   const x = 60 + Math.sin(t * 0.9) * 6;
   const y = plats[0].y - 4 - hop * 46;
@@ -1591,6 +1727,10 @@ function boot() {
   resetGame();
   game.state = 'ready';
   refreshStart();
+  /* 每次进页面随机挑一张奶蛙图当背景 */
+  applyRandomBg($('startPhoto'));
+  applyRandomBg($('boardPhoto'));
+  applyRandomBg($('overPhoto'));
   /* 排行榜改成「点了才渲染」：在线榜由 leaderboard.js 负责，
      这里预渲染只会先闪一下本机记录，没必要 */
   bindInput();
@@ -1621,5 +1761,5 @@ function boot() {
 }
 
 boot();
-window.__naiwa = { game, Store, SFX, Snd, IMG, resetGame, startGame, difficulty, spawnNext, powerForRange, rangeOf, buildShareCard };
+window.__naiwa = { game, Store, SFX, Snd, IMG, resetGame, startGame, difficulty, spawnNext, powerForRange, rangeOf, buildShareCard, randomBg, drawNaiwa, BG_COUNT };
 })();

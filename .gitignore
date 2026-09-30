@@ -1,3 +1,4 @@
 # 临时验证文件，不发布
 _*.html
 _smoke/
+tools/_out/

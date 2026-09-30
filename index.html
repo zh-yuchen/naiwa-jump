@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>奶娃跳一跳</title>
-<meta name="description" content="长按蓄力，松手起跳。跳中平台中心触发完美连击 —— 这就是奶娃！">
+<title>奶蛙跳一跳</title>
+<meta name="description" content="长按蓄力，松手起跳。跳中平台中心触发完美连击 —— 这就是奶蛙！">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='52' rx='34' ry='42' fill='%23ffd84d'/><ellipse cx='50' cy='64' rx='18' ry='20' fill='%23fff3d0'/><circle cx='38' cy='34' r='9' fill='%238fbf4a'/><circle cx='62' cy='34' r='9' fill='%238fbf4a'/><circle cx='38' cy='34' r='4' fill='%23222'/><circle cx='62' cy='34' r='4' fill='%23222'/></svg>">
 </head>
@@ -43,11 +43,11 @@
 
   <!-- ===== 开始页 ===== -->
   <div id="startScreen" class="layer overlay show">
-    <div class="bg-photo" style="background-image:url('assets/meme-happy.jpg')"></div>
+    <div class="bg-photo" id="startPhoto"></div>
     <div class="bg-veil"></div>
     <div class="panel">
       <div class="logo">
-        <span class="logo-nai">奶娃</span><span class="logo-jump">跳一跳</span>
+        <span class="logo-nai">奶蛙</span><span class="logo-jump">跳一跳</span>
       </div>
       <p class="tagline">长按蓄力 · 松手起跳 · 跳中中心 = 完美连击</p>
       <canvas id="heroArt" class="hero-art" width="360" height="260"></canvas>
@@ -70,11 +70,11 @@
 
   <!-- ===== 结束页 ===== -->
   <div id="overScreen" class="layer overlay">
-    <div class="bg-photo" id="overPhoto" style="background-image:url('assets/meme-broken.jpg')"></div>
+    <div class="bg-photo" id="overPhoto"></div>
     <div class="bg-veil dark"></div>
     <div class="panel">
       <div class="over-title" id="overTitle">破防了，再來一局？</div>
-      <div class="over-sub" id="overSub">跳空了…奶娃掉下去了</div>
+      <div class="over-sub" id="overSub">跳空了…奶蛙掉下去了</div>
       <div class="result-row">
         <div class="result-card">
           <div class="result-num" id="overScore">0</div>
@@ -100,10 +100,10 @@
 
   <!-- ===== 排行榜 ===== -->
   <div id="boardScreen" class="layer overlay">
-    <div class="bg-photo" style="background-image:url('assets/meme-abstract.jpg')"></div>
+    <div class="bg-photo" id="boardPhoto"></div>
     <div class="bg-veil"></div>
     <div class="panel">
-      <div class="panel-title">奶娃榜</div>
+      <div class="panel-title">奶蛙榜</div>
       <div class="nick-row">
         <label for="nickInput">我的昵称</label>
         <input id="nickInput" type="text" maxlength="12" placeholder="默认用户" autocomplete="off"
@@ -136,7 +136,7 @@
   <!-- ===== 横屏提示 ===== -->
   <div id="rotate" class="layer rotate hidden">
     <div class="rotate-icon">📱</div>
-    <div>请把手机竖过来玩<br><span>奶娃在 9:16 的竖屏里才跳得动</span></div>
+    <div>请把手机竖过来玩<br><span>奶蛙在 9:16 的竖屏里才跳得动</span></div>
   </div>
 
   <!-- ===== 首帧加载 ===== -->
