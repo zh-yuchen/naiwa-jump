@@ -119,7 +119,7 @@ function fetchBoard(attempt) {
       /* 这个接口不稳定：同一个请求会时而返回整页、时而返回空对象。
          空结果不能当成「榜是空的」，多确认几次再下结论。 */
       if (recs.length === 0 && attempt < 3) {
-        return new Promise((r) => setTimeout(r, 400)).then(() => fetchBoard(attempt + 1));
+        return new Promise((r) => setTimeout(r, 250)).then(() => fetchBoard(attempt + 1));
       }
       return rankWindow(recs);
     });
